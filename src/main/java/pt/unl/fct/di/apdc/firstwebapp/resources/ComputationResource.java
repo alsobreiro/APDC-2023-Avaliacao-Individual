@@ -143,7 +143,7 @@ public class ComputationResource {
 
 		//Keys should be generated outside transactions
 		//Construct the key from the username
-
+		// What is userKeyFactory
 		//Key userKey = userKeyFactory.newKey(data.username);
 	return null;
 	}
