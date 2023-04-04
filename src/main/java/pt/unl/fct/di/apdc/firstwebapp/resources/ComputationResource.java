@@ -24,10 +24,12 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
 import com.google.cloud.datastore.*;
+import org.apache.commons.codec.cli.Digest;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.protobuf.Timestamp;
 
+import pt.unl.fct.di.apdc.firstwebapp.util.AuthToken;
 import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
 import pt.unl.fct.di.apdc.firstwebapp.util.RegisterData;
 
@@ -144,7 +146,72 @@ public class ComputationResource {
 		//Keys should be generated outside transactions
 		//Construct the key from the username
 		//Missing userKeyFactory
-		//Key userKey = userKeyFactory.newKey(data.username);
-	return null;
+		//Key userKey = datastor.newKeyFactory().newKey(data.username);
+		Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+		Key ctrskey = datastore.newKeyFactory()
+				.addAncestors(PathElement.of("User", data.username))
+				.setKind("UserStats").newKey("counters");
+		//Generate automatically a key
+		Key logKey = datastore.allocateId(
+				datastore.newKeyFactory()
+						.addAncestors(PathElement.of("User", data.username))
+						.setKind("UserLog").newKey());
+		Transaction txn = datastore.newTransaction();
+		try{
+			Entity user = txn.get(userKey);
+			if(user == null){
+				LOG.warning("Failed login attempt for username: " + data.username);
+				return Response.status(Status.FORBIDDEN).build();
+			}
+			Entity stats = txn.get(ctrskey);
+			if(stats == null){
+				stats = Entity.newBuilder(ctrskey)
+						.set("user_stats_logins", 0L)
+						.set("user_stats_failed", 0L)
+						.set("user_first_login",com.google.cloud.Timestamp.now())
+						.set("user_last_login", com.google.cloud.Timestamp.now())
+						.build();
+			}
+			String hashedPWD = (String) user.getString("user_pwd");
+			if(hashedPWD.equals(DigestUtils.sha512Hex(data.password))){
+				Entity log = Entity.newBuilder(logKey)
+						.set("user_login_ip", request.getRemoteAddr())
+						.set("user_login_host", request.getRemoteHost())
+						.set("user_login_latlon",
+								StringValue.newBuilder(headers.getHeaderString("X-AppEngine-CityLatLong")).setExcludeFromIndexes(true).build())
+						.set("user_login_city", headers.getHeaderString("X-AppEngine-City"))
+						.set("user_login_country", headers.getHeaderString("X-AppEngine-Country"))
+						.build();
+				Entity ustats = Entity.newBuilder(ctrskey)
+						.set("user_stats_logins",1L + stats.getLong("user_stats_logins"))
+						.set("user_stats_failed", 0L)
+						.set("user_first_login", stats.getTimestamp("user_first_login"))
+						.set("user_last_login", com.google.cloud.Timestamp.now())
+						.build();
+				txn.put(log,ustats);
+				txn.commit();
+
+				AuthToken token = new AuthToken(data.username);
+				LOG.info("User "+ data.username+ " logged in sucessufully");
+				return Response.ok(g.toJson(token)).build();
+			}else{
+				Entity ustats = Entity.newBuilder(ctrskey)
+						.set("user_stats_logins",stats.getLong("user_stats_logins"))
+						.set("user_stats_failed", 1L + stats.getLong("user_stats_failed"))
+						.set("user_first_login", stats.getTimestamp("user_first_login"))
+						.set("user_last_login", stats.getTimestamp("user_last_login"))
+						.set("user_last_attemp", com.google.cloud.Timestamp.now())
+						.build();
+				txn.put(ustats);
+				txn.commit();
+				LOG.warning("Wrong password for username: " + data.username);
+				return Response.status(Status.FORBIDDEN).build();
+			}
+		}finally{
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
 	}
 }
