@@ -145,7 +145,6 @@ public class ComputationResource {
 
 		//Keys should be generated outside transactions
 		//Construct the key from the username
-		//Missing userKeyFactory
 		//Key userKey = datastor.newKeyFactory().newKey(data.username);
 		Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
 		Key ctrskey = datastore.newKeyFactory()
