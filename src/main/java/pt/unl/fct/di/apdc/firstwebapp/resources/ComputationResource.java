@@ -2,11 +2,14 @@ package pt.unl.fct.di.apdc.firstwebapp.resources;
 
 import java.io.IOException;
 import java.net.URI;
+import java.sql.Array;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,6 +26,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+
+import com.google.appengine.repackaged.com.google.datastore.v1.Filter;
+import com.google.appengine.api.datastore.Query.FilterPredicate;
 import com.google.cloud.datastore.*;
 import org.apache.commons.codec.cli.Digest;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -83,29 +89,58 @@ public class ComputationResource {
 	}//Simulates 60s execution
 	return Response.ok().build();
 	}
-
 	@POST
-	@Path("/register/v1")
-	@Consumes(MediaType.APPLICATION_JSON)
-	public Response register(RegisterData data) {
-		LOG.fine("Atempt to register user:" + data.username);
-		//Checks if data is valid
-		if(!data.validRegistration()) {
-			return Response.status(Status.BAD_REQUEST).entity("Missing or wrong parameter.").build();
+	@Path("/listUsers")
+	@Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
+	public Response listUsers(){
+		List<String> users = new ArrayList();
+		//Definir a query
+		Query<Entity> q = Query.newEntityQueryBuilder().setKind("User").build();
+		//Correr a query na datastore
+		QueryResults<Entity> qR = datastore.run(q);
+		//Percorrer os resultados da query
+		while(qR.hasNext()){
+			Entity current = qR.next();
+			users.add(current.getString("user_name"));
 		}
-		Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
-		Entity user = Entity.newBuilder(userKey).set("user_pwd", DigestUtils.sha512Hex(data.password))
-				.set("user_creation_time", g.toJson(fmt.format(new Date()))).build();
-		
-		datastore.put(user);
-		LOG.info("User " + data.username + " added");
-			
-		return Response.ok().build();
+	return Response.ok(users).build();
 	}
 	@POST
-	@Path("/register/v4")
+	@Path("/registerSU")
 	@Consumes(MediaType.APPLICATION_JSON)
-	public Response register4(RegisterData data) {
+	public Response registerSU(RegisterData data){
+		LOG.fine("Attempt to register SU: " + data.username);
+		if (!data.validRegistration()) {
+			return Response.status(Status.BAD_REQUEST).entity("Missing or wrong parameter.").build();
+		}
+		Transaction txn = datastore.newTransaction();
+		try {
+			Key userKey = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+			Entity user = txn.get(userKey);
+			if (user != null) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).entity("User already exists.").build();
+			} else {
+				user = Entity.newBuilder(userKey).set("user_name", data.username)
+						.set("user_pwd", DigestUtils.sha512Hex(data.password))
+						.set("user_email", data.email)
+						.set("user_creation_time", g.toJson(fmt.format(new Date())))
+						.build();
+				txn.add(user);
+				LOG.info("User registered " + data.username);
+				txn.commit();
+				return Response.ok("{}").build();
+			}
+		} finally {
+			if (txn.isActive()) {
+				txn.rollback();
+			}
+		}
+	}
+	@POST
+	@Path("/register")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response register(RegisterData data) {
 		LOG.fine("Attempt to register user: " + data.username);
 		if (!data.validRegistration()) {
 			return Response.status(Status.BAD_REQUEST).entity("Missing or wrong parameter.").build();
@@ -135,7 +170,7 @@ public class ComputationResource {
 		}
 	}
 	@POST
-	@Path("/login2")
+	@Path("/login")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
 	public Response doLogin(LoginData data,
