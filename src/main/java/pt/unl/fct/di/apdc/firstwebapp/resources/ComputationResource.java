@@ -1,8 +1,6 @@
 package pt.unl.fct.di.apdc.firstwebapp.resources;
 
 import java.io.IOException;
-import java.net.URI;
-import java.sql.Array;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Clock;
@@ -26,11 +24,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-
-import com.google.appengine.repackaged.com.google.datastore.v1.Filter;
-import com.google.appengine.api.datastore.Query.FilterPredicate;
 import com.google.cloud.datastore.*;
-import org.apache.commons.codec.cli.Digest;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.protobuf.Timestamp;
@@ -106,6 +100,35 @@ public class ComputationResource {
 	return Response.ok(users).build();
 	}
 	@POST
+	@Path("/deleteUser")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response deleteUser(LoginData data){
+		LOG.fine("Attempt to delete: " + data.username);
+		Transaction txn = datastore.newTransaction();
+		try{
+			Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+			Entity user = txn.get(userKey);
+			if (user == null) {
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			String hashedPWD = (String) user.getString("user_pwd");
+			if(hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
+				txn.delete(userKey);
+				txn.commit();
+				return Response.ok("{}").build();
+			}else{
+				LOG.warning("Wrong password for username: " + data.username);
+				return Response.status(Status.FORBIDDEN).build();
+			}
+		}finally {
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+	}
+	@POST
 	@Path("/registerSU")
 	@Consumes(MediaType.APPLICATION_JSON)
 	public Response registerSU(RegisterData data){
@@ -121,7 +144,8 @@ public class ComputationResource {
 				txn.rollback();
 				return Response.status(Status.BAD_REQUEST).entity("User already exists.").build();
 			} else {
-				user = Entity.newBuilder(userKey).set("user_name", data.username)
+				//.set("user_name", data.username)
+				user = Entity.newBuilder(userKey)
 						.set("user_pwd", DigestUtils.sha512Hex(data.password))
 						.set("user_email", data.email)
 						.set("user_creation_time", g.toJson(fmt.format(new Date())))
@@ -134,6 +158,7 @@ public class ComputationResource {
 		} finally {
 			if (txn.isActive()) {
 				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 			}
 		}
 	}
@@ -151,7 +176,7 @@ public class ComputationResource {
 			Entity user = txn.get(userKey);
 			if (user != null) {
 				txn.rollback();
-				return Response.status(Status.BAD_REQUEST).entity("User already exists.").build();
+				return Response.status(Status.FORBIDDEN).entity("User already exists.").build();
 			} else {
 				user = Entity.newBuilder(userKey).set("user_name", data.username)
 						.set("user_pwd", DigestUtils.sha512Hex(data.password))
@@ -166,6 +191,7 @@ public class ComputationResource {
 		} finally {
 			if (txn.isActive()) {
 				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 			}
 		}
 	}
@@ -195,7 +221,7 @@ public class ComputationResource {
 			Entity user = txn.get(userKey);
 			if(user == null){
 				LOG.warning("Failed login attempt for username: " + data.username);
-				return Response.status(Status.FORBIDDEN).build();
+				return Response.status(Status.BAD_REQUEST).build();
 			}
 			Entity stats = txn.get(ctrskey);
 			if(stats == null){
