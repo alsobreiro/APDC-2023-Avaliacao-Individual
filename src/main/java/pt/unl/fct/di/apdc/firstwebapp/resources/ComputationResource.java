@@ -499,9 +499,9 @@ public class ComputationResource {
 			}if(user == null){
 				return Response.status(Status.BAD_REQUEST).build();
 			}
-			Key suToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
-			Key gsToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
-			Key gboToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+			Key suToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.userToDelete);
+			Key gsToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.userToDelete);
+			Key gboToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.userToDelete);
 			int k = 2;
 			Entity userToRemove = datastore.get(gboToRemove);
 			if(userToRemove==null){userToRemove=datastore.get(gsToRemove); k--;}
