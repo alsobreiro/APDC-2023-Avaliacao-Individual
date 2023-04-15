@@ -147,11 +147,16 @@ public class ComputationResource {
 				txn.rollback();
 				return Response.status(Status.BAD_REQUEST).entity("User already exists.").build();
 			} else {
-				//.set("user_name", data.username)
-				user = Entity.newBuilder(userKey)
+				user = Entity.newBuilder(userKey).set("user_name", data.username)
 						.set("user_pwd", DigestUtils.sha512Hex(data.password))
 						.set("user_email", data.email)
 						.set("user_creation_time", g.toJson(fmt.format(new Date())))
+						.set("user_profileType", data.profileType)
+						.set("user_phone", String.valueOf(data.phone))
+						.set("user_occupation", data.occupation)
+						.set("user_workPlace", data.workPlace)
+						.set("user_nif", data.nif)
+						.set("user_status", data.status)
 						.build();
 				txn.add(user);
 				LOG.info("User registered " + data.username);
