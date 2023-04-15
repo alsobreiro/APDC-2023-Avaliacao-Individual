@@ -2,14 +2,11 @@ package pt.unl.fct.di.apdc.firstwebapp.util;
 
 public class DeleteOthers {
     public String username;
-
-    public String toDelete;
-
+    public String userToDelete;
     public DeleteOthers(){}
-
-    public DeleteOthers(String username, String toDelete){
+    public DeleteOthers(String username, String userToDelete){
         this.username = username;
-        this.toDelete = toDelete;
+        this.userToDelete = userToDelete;
     }
 
 }
