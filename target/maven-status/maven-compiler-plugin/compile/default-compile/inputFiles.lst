@@ -1,6 +1,8 @@
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/resources/LoginResource.java
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/filters/AdditionalResponseHeadersFilter.java
+/Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/util/Logout.java
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/util/AuthToken.java
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/util/RegisterData.java
+/Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/util/UpdatePassword.java
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/util/LoginData.java
 /Users/alsobreiro/Desktop/APDC/APDC-2023-Avaliacao-Individual/src/main/java/pt/unl/fct/di/apdc/firstwebapp/resources/ComputationResource.java

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="app.js" ></script>
+<head>
+    <meta charset="UTF-8">
+    <title>User page</title>
+</head>
+<body>
+<h1>User page</h1>
+<h1>User data:</h1>
+<p id="usershow" >No user yet</p>
+<p id="tokenshow"></p>
+<p id="dateshow" ></p>
+<h2>Delete User</h2>
+<form method = "post" action = "">
+    <input id="delPwd" type="password" placeholder="Password">
+    <input id="deleteAccountButton" type="button" value="Delete Account"
+           onclick="sendDeleteAccount()"><br><br>
+</form>
+<form method = "post" action = "">
+<h2>Change Password</h2>
+    <input id="oldPwd" type="password" placeholder="Current Password"><br></br>
+    <input id="newPwd" type="password" placeholder="New Password">
+    <input id="newPwdCheck" type="password" placeholder="Confirm Password">
+    <input id="updatePasswordButton" type="button" value="Update Password"
+           onclick="sendUpdatePassword()"><br><br>
+</form>
+<form method = "post" action = "">
+    <input id="logoutButton" type="button" value="Logout"
+           onclick="sendLogout()"><br><br>
+</form>
+<td><a href='/updateStats.html'>Go back</a></td>
+</body>
+</html>

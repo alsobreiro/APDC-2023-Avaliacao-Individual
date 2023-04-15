@@ -29,9 +29,9 @@ import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.protobuf.Timestamp;
 
-import pt.unl.fct.di.apdc.firstwebapp.util.AuthToken;
-import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
-import pt.unl.fct.di.apdc.firstwebapp.util.RegisterData;
+import org.apache.http.client.entity.EntityBuilder;
+import org.checkerframework.checker.units.qual.A;
+import pt.unl.fct.di.apdc.firstwebapp.util.*;
 
 import com.google.cloud.tasks.v2.*;
 import com.google.gson.Gson;
@@ -61,7 +61,7 @@ public class ComputationResource {
 	try (CloudTasksClient client = CloudTasksClient.create()) {
 		String queuePath = QueueName.of(projectId, location,
 				queueName).toString();
-		Task.Builder taskBuilder =Task.newBuilder().setAppEngineHttpRequest(AppEngineHttpRequest.newBuilder() 
+		Task.Builder taskBuilder =Task.newBuilder().setAppEngineHttpRequest(AppEngineHttpRequest.newBuilder()
 				.setRelativeUri("/rest/utils/compute").setHttpMethod(HttpMethod.POST)
 				.build());
 		taskBuilder.setScheduleTime(Timestamp.newBuilder().setSeconds(Instant.now(Clock.systemUTC()).getEpochSecond()));
@@ -70,19 +70,7 @@ public class ComputationResource {
 
 	return Response.ok().build();
 	}
-	
-	@POST
-	@Path("/compute")
-	public Response executeComputeTask() {
-	LOG.fine("Starting to execute computation taks");
-	try { 
-		Thread.sleep(60*1000*10);//10 min...	
-	} catch (Exception e) {
-		LOG.logp(Level.SEVERE, this.getClass().getCanonicalName(), "executeComputeTask", "An exception has ocurred", e);
-		return Response.serverError().build();
-	}//Simulates 60s execution
-	return Response.ok().build();
-	}
+
 	@POST
 	@Path("/listUsers")
 	@Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
@@ -95,7 +83,9 @@ public class ComputationResource {
 		//Percorrer os resultados da query
 		while(qR.hasNext()){
 			Entity current = qR.next();
-			users.add(current.getString("user_name"));
+			if(current.getString("user_status").equals("active")){
+				users.add(current.getString("user_name"));
+			}
 		}
 	return Response.ok(users).build();
 	}
@@ -107,16 +97,29 @@ public class ComputationResource {
 		Transaction txn = datastore.newTransaction();
 		try{
 			Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+			Key tokenKey = datastore.newKeyFactory().setKind("token").newKey(data.username);
 			Entity user = txn.get(userKey);
-			if (user == null) {
+			Entity token = txn.get(tokenKey);
+			if(token == null || user == null){
 				txn.rollback();
 				return Response.status(Status.BAD_REQUEST).build();
 			}
+			if(isTokenValid(token)){
+				txn.delete(tokenKey);
+				txn.commit();
+				return Response.status(Status.REQUEST_TIMEOUT).build();
+			}
 			String hashedPWD = (String) user.getString("user_pwd");
 			if(hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
-				txn.delete(userKey);
-				txn.commit();
-				return Response.ok("{}").build();
+				if(token == null){
+					txn.delete(userKey);
+					txn.commit();
+				}
+				else {
+					txn.delete(userKey, tokenKey);
+					txn.commit();
+				}
+				return Response.ok().build();
 			}else{
 				LOG.warning("Wrong password for username: " + data.username);
 				return Response.status(Status.FORBIDDEN).build();
@@ -182,6 +185,12 @@ public class ComputationResource {
 						.set("user_pwd", DigestUtils.sha512Hex(data.password))
 						.set("user_email", data.email)
 						.set("user_creation_time", g.toJson(fmt.format(new Date())))
+						.set("user_profileType", data.profileType)
+						.set("user_phone", String.valueOf(data.phone))
+						.set("user_occupation", data.occupation)
+						.set("user_workPlace", data.workPlace)
+						.set("user_nif", data.nif)
+						.set("user_status", data.status)
 						.build();
 				txn.add(user);
 				LOG.info("User registered " + data.username);
@@ -248,11 +257,18 @@ public class ComputationResource {
 						.set("user_first_login", stats.getTimestamp("user_first_login"))
 						.set("user_last_login", com.google.cloud.Timestamp.now())
 						.build();
-				txn.put(log,ustats);
-				txn.commit();
+
 
 				AuthToken token = new AuthToken(data.username);
-				LOG.info("User "+ data.username+ " logged in sucessufully");
+				Key tokenKey = datastore.newKeyFactory().setKind("token").newKey(token.username);
+				Entity utoken = Entity.newBuilder(tokenKey)
+								.set("username", token.username)
+								.set("tokenID",token.tokenID)
+								.set("creationData",token.creationData)
+								.set("expirationTime",token.expirationTime).build();
+				txn.put(log,ustats,utoken);
+				txn.commit();
+				LOG.info("User "+ data.username+ " logged in successfully");
 				return Response.ok(g.toJson(token)).build();
 			}else{
 				Entity ustats = Entity.newBuilder(ctrskey)
@@ -273,5 +289,178 @@ public class ComputationResource {
 				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
 			}
 		}
+	}
+	@POST
+	@Path("/updatePassword")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response updatePassword(UpdatePassword data){
+		Transaction txn = datastore.newTransaction();
+		try{
+			Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+			Key tokenKey = datastore.newKeyFactory().setKind("token").newKey(data.username);
+			Entity user = txn.get(userKey);
+			Entity token = txn.get(tokenKey);
+			if(token == null || user == null){
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			if(isTokenValid(token)){
+				txn.delete(tokenKey);
+				txn.commit();
+				return Response.status(Status.REQUEST_TIMEOUT).build();
+			}
+			 String hashedPWD = (String) user.getString("user_pwd");
+			 if(hashedPWD.equals(DigestUtils.sha512Hex(data.oldPassword))){
+				Entity updatedUser = Entity.newBuilder(userKey).set("user_name", data.username)
+						.set("user_pwd", DigestUtils.sha512Hex(data.newPassword))
+						.set("user_email", user.getString("user_email"))
+						.set("user_creation_time",user.getString("user_creation_time"))
+						.build();
+				txn.put(updatedUser);
+				txn.commit();
+				return Response.ok().build();
+			 }
+			 else{
+				 txn.rollback();
+				 return Response.status(Status.FORBIDDEN).build();
+			 }
+		}finally {
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+	}
+	@POST
+	@Path("/logout")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response logout(Logout data){
+		Transaction txn = datastore.newTransaction();
+		try {
+			Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+			Key tokenKey = datastore.newKeyFactory().setKind("token").newKey(data.username);
+			Entity user = txn.get(userKey);
+			Entity token = txn.get(tokenKey);
+			if(token == null || user == null){
+				txn.rollback();
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			if(isTokenValid(token)){
+				txn.delete(tokenKey);
+				txn.commit();
+				return Response.status(Status.REQUEST_TIMEOUT).build();
+			}
+			txn.delete(tokenKey);
+			txn.commit();
+			return Response.ok().build();
+		}finally{
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+	}
+
+	@POST
+	@Path("/activate")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response activateUser(LoginData data){
+		Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+		Transaction txn = datastore.newTransaction();
+		try{
+			Entity user = txn.get(userKey);
+			if(user == null){
+				LOG.warning("User does not exist: " + data.username);
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			String hashedPWD = (String) user.getString("user_pwd");
+			if(hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
+				Entity activeUser = Entity.newBuilder(userKey).set("user_name", data.username)
+						.set("user_pwd", DigestUtils.sha512Hex(data.password))
+						.set("user_email", user.getString("user_email"))
+						.set("user_creation_time", user.getString("user_creation_time"))
+						.set("user_profileType", user.getString("user_profileType"))
+						.set("user_phone", user.getString("user_phone"))
+						.set("user_occupation", user.getString("user_occupation"))
+						.set("user_workPlace", user.getString("user_workPlace"))
+						.set("user_nif", user.getString("user_nif"))
+						.set("user_status", "active")
+						.build();
+				txn.put(activeUser);
+				txn.commit();
+				return Response.ok().build();
+			}
+			else{
+				txn.rollback();
+				return Response.status(Status.FORBIDDEN).build();
+			}
+		}finally{
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+	}
+	@POST
+	@Path("/changeSelf")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response changeSelf(SelfChange data){
+		Key userKey = datastore.newKeyFactory().setKind("User").newKey(data.username);
+		Transaction txn = datastore.newTransaction();
+		try{
+			Entity user = txn.get(userKey);
+			if(user == null){
+				LOG.warning("User does not exist: " + data.username);
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			String profileType;
+			if(data.profileType.equals("")){
+				profileType = user.getString("user_profileType");
+			}else{ profileType = data.profileType;}
+			String phone;
+			if(data.phone.equals("")){
+				phone= user.getString("user_phone");
+			}else{ phone = data.phone;}
+			String occupation;
+			if(data.occupation.equals("")){
+				occupation= user.getString("user_occupation");
+			}else{occupation = data.occupation;}
+			String workPlace;
+			if(data.workPlace.equals("")){
+				workPlace= user.getString("user_workPlace");
+			}else{workPlace = data.workPlace;}
+			String nif;
+			if(data.nif.equals("")){
+				nif= user.getString("user_nif");
+			}else{nif = data.nif;}
+			String status;
+			if(data.status.equals("")){
+				status = user.getString("user_nif");
+			}else{status = data.status;}
+
+			Entity activeUser = Entity.newBuilder(userKey).set("user_name", data.username)
+					.set("user_pwd", user.getString("user_pwd"))
+					.set("user_email", user.getString("user_email"))
+					.set("user_creation_time", user.getString("user_creation_time"))
+					.set("user_profileType", profileType)
+					.set("user_phone", phone)
+					.set("user_occupation", occupation)
+					.set("user_workPlace", workPlace)
+					.set("user_nif", nif)
+					.set("user_status", status)
+					.build();
+		}finally {
+			if(txn.isActive()){
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+		return Response.ok().build();
+	}
+//Return true valido, false invalido
+	private boolean isTokenValid(Entity token){
+		long currentTime = System.currentTimeMillis();
+		long validation = token.getLong("expirationTime");
+		return validation<currentTime;
 	}
 }
