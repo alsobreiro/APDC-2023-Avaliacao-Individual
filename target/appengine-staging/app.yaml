@@ -3,7 +3,7 @@ inbound_services:
 - warmup
 auto_id_policy: default
 beta_settings:
-  'source_reference': 'https://github.com/alsobreiro/APDC-2023-Avaliacao-Individual.git#627b6632435d5d3ce814a08596451d6a2c9003f5'
+  'source_reference': 'https://github.com/alsobreiro/APDC-2023-Avaliacao-Individual.git#22afc52db60b39398b9b2c43638461f873077e82'
 handlers:
 - url: (/secret/.*/)
   static_files: __static__\1index.html

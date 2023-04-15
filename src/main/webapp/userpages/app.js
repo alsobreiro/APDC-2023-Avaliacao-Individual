@@ -88,8 +88,6 @@ function sendUpdatePassword(){
         var objectCompact = {username: username, oldPassword: oldPwd, newPassword: newPwd};
         var JSONtransform = JSON.stringify(objectCompact);
 
-        alert(JSONtransform);
-
         var xmlhttp = new XMLHttpRequest();
 
         xmlhttp.open("POST", "https://alien-container-379310.oa.r.appspot.com/rest/utils/updatePassword", true);

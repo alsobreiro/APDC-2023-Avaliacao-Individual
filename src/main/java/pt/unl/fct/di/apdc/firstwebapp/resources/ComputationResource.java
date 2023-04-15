@@ -204,6 +204,8 @@ public class ComputationResource {
 			}
 		}
 	}
+
+
 	@POST
 	@Path("/login")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -290,6 +292,8 @@ public class ComputationResource {
 			}
 		}
 	}
+
+	//Working
 	@POST
 	@Path("/updatePassword")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -311,11 +315,17 @@ public class ComputationResource {
 			}
 			 String hashedPWD = (String) user.getString("user_pwd");
 			 if(hashedPWD.equals(DigestUtils.sha512Hex(data.oldPassword))){
-				Entity updatedUser = Entity.newBuilder(userKey).set("user_name", data.username)
-						.set("user_pwd", DigestUtils.sha512Hex(data.newPassword))
-						.set("user_email", user.getString("user_email"))
-						.set("user_creation_time",user.getString("user_creation_time"))
-						.build();
+				 Entity updatedUser = Entity.newBuilder(userKey).set("user_name", data.username)
+						 .set("user_pwd", DigestUtils.sha512Hex(data.newPassword))
+						 .set("user_email", user.getString("user_email"))
+						 .set("user_creation_time", user.getString("user_creation_time"))
+						 .set("user_profileType", user.getString("user_profileType"))
+						 .set("user_phone", user.getString("user_phone"))
+						 .set("user_occupation", user.getString("user_occupation"))
+						 .set("user_workPlace", user.getString("user_workPlace"))
+						 .set("user_nif", user.getString("user_nif"))
+						 .set("user_status", user.getString("user_status")).build();
+
 				txn.put(updatedUser);
 				txn.commit();
 				return Response.ok().build();
@@ -331,6 +341,8 @@ public class ComputationResource {
 			}
 		}
 	}
+
+	//Working
 	@POST
 	@Path("/logout")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -360,7 +372,7 @@ public class ComputationResource {
 			}
 		}
 	}
-
+	//Working
 	@POST
 	@Path("/activate")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -401,6 +413,8 @@ public class ComputationResource {
 			}
 		}
 	}
+
+	//Has error in atribute variables
 	@POST
 	@Path("/changeSelf")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -414,28 +428,28 @@ public class ComputationResource {
 				return Response.status(Status.BAD_REQUEST).build();
 			}
 			String profileType;
-			if(data.profileType.equals("")){
+			if(data.profileType == null){
 				profileType = user.getString("user_profileType");
 			}else{ profileType = data.profileType;}
 			String phone;
-			if(data.phone.equals("")){
+			if(data.phone == null){
 				phone= user.getString("user_phone");
 			}else{ phone = data.phone;}
 			String occupation;
-			if(data.occupation.equals("")){
+			if(data.occupation == null){
 				occupation= user.getString("user_occupation");
 			}else{occupation = data.occupation;}
 			String workPlace;
-			if(data.workPlace.equals("")){
+			if(data.workPlace == null){
 				workPlace= user.getString("user_workPlace");
 			}else{workPlace = data.workPlace;}
 			String nif;
-			if(data.nif.equals("")){
+			if(data.nif == null){
 				nif= user.getString("user_nif");
 			}else{nif = data.nif;}
 			String status;
-			if(data.status.equals("")){
-				status = user.getString("user_nif");
+			if(data.status == null){
+				status = user.getString("user_status");
 			}else{status = data.status;}
 
 			Entity activeUser = Entity.newBuilder(userKey).set("user_name", data.username)
