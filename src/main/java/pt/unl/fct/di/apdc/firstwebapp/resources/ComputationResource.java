@@ -471,6 +471,50 @@ public class ComputationResource {
 		}
 		return Response.ok().build();
 	}
+
+	//Metodos SU GS GBO
+	@POST
+	@Path("/removeOthers")
+	@Consumes(MediaType.APPLICATION_JSON)
+	public Response removeOtherUsers(DeleteOthers data) {
+		Key suKey = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+		Key gsKey = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+		Key gboKey = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+		Transaction txn = datastore.newTransaction();
+		int i = 0;
+		try {
+			Entity user = datastore.get(suKey);
+			if (user == null) {
+				i = 1;
+				user = datastore.get(gsKey);
+			}
+			if (user == null) {
+				i = 2;
+				user = datastore.get(gboKey);
+			}if(user == null){
+				return Response.status(Status.BAD_REQUEST).build();
+			}
+			Key suToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+			Key gsToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+			Key gboToRemove = datastore.newKeyFactory().setKind("SU").newKey(data.username);
+			int k = 2;
+			Entity userToRemove = datastore.get(gboToRemove);
+			if(userToRemove==null){userToRemove=datastore.get(gsToRemove); k--;}
+			if(userToRemove==null){userToRemove=datastore.get(suToRemove);k--;}
+			if(i >= k) {
+				txn.delete(userToRemove.getKey());
+				txn.commit();
+				return Response.ok().build();
+			}else{
+				return Response.status(Status.FORBIDDEN).build();
+			}
+		} finally {
+			if (txn.isActive()) {
+				txn.rollback();
+				return Response.status(Status.INTERNAL_SERVER_ERROR).build();
+			}
+		}
+	}
 //Return true valido, false invalido
 	private boolean isTokenValid(Entity token){
 		long currentTime = System.currentTimeMillis();
